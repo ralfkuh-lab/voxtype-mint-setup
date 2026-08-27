@@ -20,7 +20,7 @@ löst die Mint-spezifischen Probleme:
 ## Installation
 
 ```bash
-git clone <url> ~/dev/voxtype-mint-setup
+git clone https://github.com/ralfkuh-lab/voxtype-mint-setup.git ~/dev/voxtype-mint-setup
 cd ~/dev/voxtype-mint-setup
 ./install.sh
 ```
