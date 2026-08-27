@@ -1,21 +1,31 @@
 # voxtype-mint-setup
 
-Komplette, reproduzierbare Einrichtung von [Voxtype](https://voxtype.io)
-(lokales Push-to-talk-Diktat, Parakeet-Engine) auf **Linux Mint 22.x mit
-X11/Cinnamon** — inklusive Tray-Icon mit Zustandsanzeige.
+Complete, reproducible setup of [Voxtype](https://voxtype.io) — local
+push-to-talk dictation with the Parakeet engine — on **Linux Mint 22.x with
+X11/Cinnamon**, including a tray icon that shows the recording state.
 
-Voxtype ist primär für Wayland (Hyprland/Omarchy) gebaut; unter Mint/X11
-laufen einige Dinge anders als in der Anleitung des Projekts. Dieses Repo
-löst die Mint-spezifischen Probleme:
+Voxtype is primarily built for Wayland (Hyprland/Omarchy). On Mint/X11 a
+number of things break in non-obvious ways; this repo fixes all of them and
+wraps the result in one idempotent install script.
 
-| Problem unter Mint 22.x | Lösung hier |
+## Problems this repo solves
+
+| Problem on Mint 22.x | Solution here |
 |---|---|
-| Distro-`ydotool` 0.1.8 versteht die moderne key-Syntax nicht — beim Einfügen erscheint wörtlich `2442` statt Text | ydotool **1.0.4** (offizielle Binaries) nach `/usr/local/bin` + `ydotoold`-User-Service |
-| `ydotool type` kann auf deutschem Layout keine Umlaute tippen (US-Keycode-Mapping) | [`dotool`](https://git.sr.ht/~geb/dotool) aus dem Quellcode, mit `dotool_xkb_layout = "de"` — tippt äöüß korrekt, funktioniert in Terminal **und** GUI gleich |
-| Paste-Modus (Strg+V) scheitert in Terminals; Shift+Einfg fügt in kitty/gnome-terminal die Primary-Selection ein, nicht das Clipboard | Type-Modus mit dotool statt Paste — Clipboard bleibt unangetastet |
-| Hotkey braucht die `input`-Gruppe; die greift erst nach vollständigem Neustart des systemd-User-Managers | udev-Regel mit `uaccess`-Tag: ACL für den aktiven Seat-User, wirkt sofort, enger gefasst als die Gruppe |
-| `voxtype-osd` (Aufnahme-Overlay) setzt Wayland-Layer-Shell voraus — unter X11 nicht lauffähig | eigenes **Tray-Icon** (XApp.StatusIcon): grau = bereit, grün = Aufnahme, gelb = transkribiert; Linksklick = Aufnahme umschalten |
-| Notebook ohne ScrollLock-Taste (Default-Hotkey) | Hotkey `RIGHTCTRL` (rechte Strg, Push-to-talk) |
+| The distro ships `ydotool` 0.1.8, which does not understand the modern key syntax Voxtype uses — pasting literally types `2442` instead of your text | **ydotool 1.0.4** (official release binaries) installed to `/usr/local/bin` + a `ydotoold` systemd user service |
+| `ydotool type` cannot type umlauts on a German layout (US keycode mapping) | [`dotool`](https://git.sr.ht/~geb/dotool) built from source, configured with `dotool_xkb_layout = "de"` — types äöüß correctly and behaves identically in terminals **and** GUI apps |
+| Paste mode (Ctrl+V) fails in terminals; Shift+Insert pastes the primary selection in kitty/gnome-terminal, not the clipboard | Type mode via dotool instead of paste — the clipboard is never touched |
+| The hotkey needs the `input` group, which only takes effect after a full restart of the systemd user manager | udev rule with the `uaccess` tag: ACL for the active seat user — takes effect immediately and is scoped tighter than group membership |
+| `voxtype-osd` (the recording overlay) requires Wayland layer-shell and cannot run on X11 | A custom **tray icon** (XApp.StatusIcon): grey = ready, green = recording, yellow = transcribing; left-click toggles recording |
+| Laptop keyboards without a ScrollLock key (Voxtype's default hotkey) | Hotkey `RIGHTCTRL` (right Ctrl, push-to-talk) |
+
+## Requirements
+
+- Linux Mint 22.x (Ubuntu 24.04 base) — other Ubuntu-based distros will
+  likely work but are untested
+- X11 session (Cinnamon; the output chain relies on `dotool`/`xclip`)
+- x86-64 CPU with AVX2 (Voxtype baseline)
+- ~1 GB disk for the Voxtype package and the Parakeet model
 
 ## Installation
 
@@ -25,49 +35,84 @@ cd ~/dev/voxtype-mint-setup
 ./install.sh
 ```
 
-Das Skript ist idempotent und fragt bei Bedarf per sudo nach. Danach:
-**rechte Strg halten, sprechen, loslassen** — der Text wird an der
-Cursor-Position getippt.
+The script is idempotent (safe to re-run) and asks for sudo where needed. It
+installs, in order: apt dependencies, the official Voxtype `.deb`,
+ydotool 1.0.4 (removing the incompatible distro package), dotool (built from
+source), the udev rule, the systemd user services, the Voxtype configuration,
+the Parakeet model (~670 MB download), and the tray autostart entry.
 
-## Komponenten
+Afterwards: **hold right Ctrl, speak, release** — the transcribed text is
+typed at the cursor position.
 
-- `install.sh` — idempotentes Komplett-Setup (Pakete, Voxtype-.deb,
-  ydotool 1.0.4, dotool-Build, udev-Regel, Services, Config, Tray)
-- `config/config.toml` — Voxtype-Konfiguration (Parakeet int8, Type-Modus
-  via dotool, Layout de, Hotkey RIGHTCTRL, Feedback/OSD aus)
-- `system/70-voxtype-uaccess.rules` — udev-Regel (uaccess für Input-Devices)
-- `system/ydotoold.service` — systemd-User-Unit für den ydotool-Daemon
-- `tray/voxtype-tray.py` — Tray-Icon; beobachtet
-  `$XDG_RUNTIME_DIR/voxtype/state` per File-Monitor (kein Polling im
-  Normalfall), Rechtsklick-Menü mit Neustart/Beenden
-- `tray/make-icons.py` — erzeugt die Zustands-Icons aus `tray/icons/mic-base.png`
-  (Basis-Glyph mit GPT Image 2 generiert, Alpha nachträglich extrahiert)
+## Usage
 
-## Betrieb
+- **Dictate:** hold `RIGHTCTRL` (push-to-talk), speak, release.
+- **Tray icon:** grey microphone = ready, green = recording,
+  yellow = transcribing. Left-click toggles recording; right-click opens the
+  menu (settings TUI, GPU toggle, restart daemon, quit tray).
+- **Language:** Parakeet (`parakeet-tdt-0.6b-v3-int8`, ~640 MB, CPU,
+  multilingual incl. German/English) auto-detects the spoken language and
+  transcribes ~7 s of audio in ~0.3 s on a modern CPU.
+
+## Configuration
+
+Voxtype's config lives at `~/.config/voxtype/config.toml` (this repo carries
+the deployed version under `config/config.toml`). Useful commands:
 
 ```bash
-systemctl --user status voxtype     # Daemon
-journalctl --user -u voxtype -f     # Logs
-voxtype configure                   # Konfigurations-TUI (Achtung: schreibt
-                                    # die config.toml neu — Abweichungen
-                                    # danach ggf. hier ins Repo zurückspielen)
-voxtype record toggle               # Aufnahme per Kommando (macht auch der
-                                    # Linksklick aufs Tray-Icon)
+systemctl --user status voxtype     # daemon state
+journalctl --user -u voxtype -f     # logs
+voxtype configure                   # interactive TUI (careful: rewrites
+                                    # config.toml — sync changes back here)
+voxtype record toggle               # toggle recording from scripts
+voxtype setup model                 # switch/download models
 ```
 
-Modellwahl: `parakeet-tdt-0.6b-v3-int8` (~640 MB, CPU, mehrsprachig inkl.
-Deutsch, transkribiert ~7 s Audio in ~0,3 s). Alternativen:
-`voxtype setup model`.
+Common tweaks:
 
-## GPU-Beschleunigung
+- **Hotkey:** `[hotkey] key = "RIGHTCTRL"` — any evdev key name works
+  (`evtest` shows the names); `mode = "toggle"` switches from push-to-talk
+  to press-once/press-again.
+- **Keyboard layout:** `[output] dotool_xkb_layout = "de"` — set to your
+  XKB layout so special characters are typed correctly.
+- **Feedback:** notifications and beeps are disabled by default here; the
+  tray icon is the status indicator.
 
-Auf CPUs **ohne AVX-512** (z. B. Ryzen 5000 „Cezanne") ist Parakeet auf der
-CPU bereits die schnellste Option: Voxtypes vorgebaute ONNX-CUDA-Backends
-setzen AVX-512 voraus (`voxtype setup gpu --enable` verweigert sonst mit
-Fehlermeldung), und die einzige verbleibende GPU-Route — Rückwechsel auf die
-Whisper-Engine mit Vulkan — ist real langsamer als Parakeet-CPU.
+## GPU acceleration
 
-Auf AVX-512-Systemen schaltet der Tray-Menüpunkt **„GPU-Beschleunigung
-(CUDA)"** das Backend um (sudo über zenity-Askpass, Daemon-Neustart
-inklusive); ohne AVX-512 ist der Punkt ausgegraut. Zu bedenken: Das Modell
-liegt dann dauerhaft im VRAM und der Daemon hält die dGPU wach (Akku).
+On CPUs **without AVX-512** (e.g. Ryzen 5000 "Cezanne"), Parakeet on the CPU
+is already the fastest available option: Voxtype's prebuilt ONNX CUDA
+backends require AVX-512 (`voxtype setup gpu --enable` refuses otherwise),
+and the only remaining GPU route — switching back to the Whisper engine with
+Vulkan — is slower in practice than Parakeet on CPU.
+
+On AVX-512 systems the tray menu item **"GPU acceleration (CUDA)"** switches
+the backend (sudo via the graphical askpass, daemon restart included).
+Without AVX-512 the item is greyed out. Trade-offs when enabling: the model
+then stays resident in VRAM and the daemon keeps the dGPU awake (battery).
+
+## Repository layout
+
+- `install.sh` — idempotent full setup (packages, Voxtype `.deb`,
+  ydotool 1.0.4, dotool build, udev rule, services, config, tray)
+- `config/config.toml` — Voxtype configuration (Parakeet int8, type mode via
+  dotool, German layout, `RIGHTCTRL` hotkey, feedback/OSD off)
+- `system/70-voxtype-uaccess.rules` — udev rule (uaccess for input devices)
+- `system/ydotoold.service` — systemd user unit for the ydotool daemon
+- `tray/voxtype-tray.py` — tray icon; watches
+  `$XDG_RUNTIME_DIR/voxtype/state` with a file monitor (no polling in the
+  common case), context menu with settings/GPU/restart/quit
+- `tray/make-icons.py` — generates the state icons from
+  `tray/icons/mic-base.png` (base glyph generated with GPT Image 2, alpha
+  channel extracted afterwards)
+
+## Uninstall
+
+```bash
+systemctl --user disable --now voxtype ydotoold
+rm ~/.config/autostart/voxtype-tray.desktop ~/.config/systemd/user/ydotoold.service
+sudo apt remove voxtype
+sudo rm /usr/local/bin/ydotool /usr/local/bin/ydotoold /usr/local/bin/dotool \
+        /etc/udev/rules.d/70-voxtype-uaccess.rules
+rm -rf ~/.config/voxtype ~/.local/share/voxtype   # config + models
+```

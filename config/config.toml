@@ -178,7 +178,7 @@ fallback_to_clipboard = true
 #   driver_order = ["ydotool"]
 driver_order = ["dotool", "ydotool", "clipboard"]
 
-# Tastaturlayout fuer dotool (tippt Umlaute korrekt auf deutschem Layout)
+# Keyboard layout for dotool (types umlauts correctly on a German layout)
 dotool_xkb_layout = "de"
 
 # Per-language XKB layout variants for multilingual dictation.

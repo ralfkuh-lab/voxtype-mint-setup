@@ -1,5 +1,5 @@
 [Unit]
-Description=ydotool user daemon (uinput backend fuer voxtype)
+Description=ydotool user daemon (uinput backend for voxtype)
 
 [Service]
 ExecStart=/usr/local/bin/ydotoold --socket-path=%t/.ydotool_socket --socket-perm=0600

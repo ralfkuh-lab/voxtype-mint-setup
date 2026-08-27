@@ -1,31 +1,31 @@
 #!/usr/bin/env python3
-"""Erzeugt die Tray-Icons aus dem generierten Basis-Icon (mic-base.png).
+"""Generates the tray icons from the generated base icon (mic-base.png).
 
-Das Basis-Icon kommt aus GPT Image 2 und hat einen eingebackenen
-Schachbrett-Hintergrund (kein Alpha). Dieses Skript extrahiert den weissen
-Mikrofon-Glyph (Schachbrett-Grautoene ~211/~233, Glyph ~254) und baut daraus
-drei Zustands-Icons mit echter Transparenz:
+The base icon comes from GPT Image 2 with a baked-in checkerboard background
+(no alpha). This script extracts the white microphone glyph (checkerboard
+grey tones ~211/~233, glyph ~254) and builds three state icons with real
+transparency from it:
 
-  mic-idle.png         - grauer Glyph, kein Hintergrund
-  mic-recording.png    - weisser Glyph auf gruenem Kreis
-  mic-transcribing.png - weisser Glyph auf gelbem Kreis
+  mic-idle.png         - grey glyph, no background
+  mic-recording.png    - white glyph on a green circle
+  mic-transcribing.png - white glyph on a yellow circle
 """
 from PIL import Image, ImageDraw
 
 SRC = "icons/mic-base.png"
 OUT_SIZE = 256
-SUPERSAMPLE = 4  # Kreis in hoher Aufloesung zeichnen, dann herunterskalieren
+SUPERSAMPLE = 4  # draw the circle at high resolution, then downscale
 
-GREY_MAX = 238   # alles unterhalb ist Hintergrund
-WHITE_REF = 252  # ab hier voll deckend
+GREY_MAX = 238   # everything below is background
+WHITE_REF = 252  # fully opaque from here on
 
-IDLE_TINT = (168, 176, 184)      # dezentes Grau fuer den Ruhezustand
-COLOR_RECORDING = (46, 158, 79)   # Gruen
-COLOR_TRANSCRIBING = (224, 163, 28)  # Amber
+IDLE_TINT = (168, 176, 184)      # subtle grey for the idle state
+COLOR_RECORDING = (46, 158, 79)   # green
+COLOR_TRANSCRIBING = (224, 163, 28)  # amber
 
 
 def extract_glyph() -> Image.Image:
-    """Weissen Glyph mit weichem Alpha aus dem Schachbrett-Bild loesen."""
+    """Lift the white glyph with soft alpha out of the checkerboard image."""
     lum = Image.open(SRC).convert("L")
     scale = 255.0 / (WHITE_REF - GREY_MAX)
     alpha = lum.point(lambda v: max(0, min(255, int((v - GREY_MAX) * scale))))
@@ -41,7 +41,7 @@ def tint(glyph: Image.Image, rgb) -> Image.Image:
 
 
 def on_canvas(glyph: Image.Image, canvas_px: int, glyph_frac: float) -> Image.Image:
-    """Glyph zentriert und proportional auf quadratische Flaeche setzen."""
+    """Place the glyph centered and proportionally on a square canvas."""
     canvas = Image.new("RGBA", (canvas_px, canvas_px), (0, 0, 0, 0))
     target = int(canvas_px * glyph_frac)
     ratio = min(target / glyph.width, target / glyph.height)
@@ -74,7 +74,7 @@ def main():
 
     with_circle(glyph, COLOR_RECORDING).save("icons/mic-recording.png")
     with_circle(glyph, COLOR_TRANSCRIBING).save("icons/mic-transcribing.png")
-    print("Icons geschrieben: mic-idle.png, mic-recording.png, mic-transcribing.png")
+    print("Icons written: mic-idle.png, mic-recording.png, mic-transcribing.png")
 
 
 if __name__ == "__main__":
