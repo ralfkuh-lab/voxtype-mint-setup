@@ -1,0 +1,9 @@
+[Unit]
+Description=ydotool user daemon (uinput backend fuer voxtype)
+
+[Service]
+ExecStart=/usr/local/bin/ydotoold --socket-path=%t/.ydotool_socket --socket-perm=0600
+Restart=on-failure
+
+[Install]
+WantedBy=default.target
