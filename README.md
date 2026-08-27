@@ -106,6 +106,10 @@ then stays resident in VRAM and the daemon keeps the dGPU awake (battery).
   `tray/icons/mic-base.png` (base glyph generated with GPT Image 2, alpha
   channel extracted afterwards)
 
+## License
+
+[MIT](LICENSE)
+
 ## Uninstall
 
 ```bash
