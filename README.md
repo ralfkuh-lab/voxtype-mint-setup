@@ -58,3 +58,16 @@ voxtype record toggle               # Aufnahme per Kommando (macht auch der
 Modellwahl: `parakeet-tdt-0.6b-v3-int8` (~640 MB, CPU, mehrsprachig inkl.
 Deutsch, transkribiert ~7 s Audio in ~0,3 s). Alternativen:
 `voxtype setup model`.
+
+## GPU-Beschleunigung
+
+Auf CPUs **ohne AVX-512** (z. B. Ryzen 5000 „Cezanne") ist Parakeet auf der
+CPU bereits die schnellste Option: Voxtypes vorgebaute ONNX-CUDA-Backends
+setzen AVX-512 voraus (`voxtype setup gpu --enable` verweigert sonst mit
+Fehlermeldung), und die einzige verbleibende GPU-Route — Rückwechsel auf die
+Whisper-Engine mit Vulkan — ist real langsamer als Parakeet-CPU.
+
+Auf AVX-512-Systemen schaltet der Tray-Menüpunkt **„GPU-Beschleunigung
+(CUDA)"** das Backend um (sudo über zenity-Askpass, Daemon-Neustart
+inklusive); ohne AVX-512 ist der Punkt ausgegraut. Zu bedenken: Das Modell
+liegt dann dauerhaft im VRAM und der Daemon hält die dGPU wach (Akku).

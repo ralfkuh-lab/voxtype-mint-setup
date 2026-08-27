@@ -14,6 +14,7 @@ Linksklick schaltet die Aufnahme um (voxtype record toggle).
 import os
 import subprocess
 import sys
+import threading
 from pathlib import Path
 
 import gi
@@ -38,6 +39,18 @@ TOOLTIPS = {
     "transcribing": "Voxtype: transkribiert …",
 }
 TOOLTIP_OFF = "Voxtype-Daemon läuft nicht (systemctl --user start voxtype)"
+
+# Der Backend-Wechsel tauscht einen Symlink unter /usr/lib/voxtype -> sudo.
+# Beim Autostart fehlt SUDO_ASKPASS (steht nur in der .bashrc), deshalb
+# explizit setzen, damit sudo -A das grafische zenity-Askpass nutzt.
+ASKPASS = Path.home() / ".local/bin/sudo-askpass"
+
+
+def sudo_env():
+    env = os.environ.copy()
+    if "SUDO_ASKPASS" not in env and ASKPASS.exists():
+        env["SUDO_ASKPASS"] = str(ASKPASS)
+    return env
 
 
 class VoxtypeTray:
@@ -68,13 +81,92 @@ class VoxtypeTray:
                 ["x-terminal-emulator", "-e", "voxtype configure"])),
             ("Voxtype neu starten", lambda *_: self.run_bg(
                 ["systemctl", "--user", "restart", "voxtype"])),
-            ("Tray beenden", lambda *_: Gtk.main_quit()),
         ):
             item = Gtk.MenuItem(label=label)
             item.connect("activate", cb)
             menu.append(item)
+
+        self._gpu_guard = False
+        self.gpu_item = Gtk.CheckMenuItem(label="GPU-Beschleunigung (CUDA)")
+        self.gpu_item.connect("toggled", self.on_gpu_toggled)
+        # Voxtypes vorgebaute ONNX-CUDA-Binaries setzen AVX-512 voraus —
+        # ohne das schlaegt --enable immer fehl, also gleich ausgrauen.
+        if not self._cpu_has_avx512():
+            self.gpu_item.set_label("GPU-Beschleunigung (benötigt AVX-512-CPU)")
+            self.gpu_item.set_sensitive(False)
+        menu.append(self.gpu_item)
+
+        quit_item = Gtk.MenuItem(label="Tray beenden")
+        quit_item.connect("activate", lambda *_: Gtk.main_quit())
+        menu.append(quit_item)
+
         menu.show_all()
+        threading.Thread(target=self._sync_gpu_state, daemon=True).start()
         return menu
+
+    # --- GPU-Backend-Umschaltung -----------------------------------------
+
+    @staticmethod
+    def _cpu_has_avx512() -> bool:
+        try:
+            return "avx512" in Path("/proc/cpuinfo").read_text()
+        except OSError:
+            return False
+
+    def query_gpu_active(self):
+        """True/False = aktives Backend ist GPU/CPU, None = nicht ermittelbar."""
+        try:
+            out = subprocess.run(
+                ["voxtype", "setup", "gpu", "--status"],
+                capture_output=True, text=True, timeout=15,
+            ).stdout
+        except (OSError, subprocess.TimeoutExpired):
+            return None
+        for line in out.splitlines():
+            if line.startswith("Active backend:"):
+                return "GPU" in line
+        return None
+
+    def _sync_gpu_state(self):
+        active = self.query_gpu_active()
+        if active is not None:
+            GLib.idle_add(self._set_gpu_check, active)
+
+    def _set_gpu_check(self, active: bool) -> bool:
+        self._gpu_guard = True
+        self.gpu_item.set_active(active)
+        self._gpu_guard = False
+        return False  # idle_add nicht wiederholen
+
+    def on_gpu_toggled(self, item):
+        if self._gpu_guard:
+            return
+        threading.Thread(
+            target=self._switch_gpu, args=(item.get_active(),), daemon=True
+        ).start()
+
+    def _switch_gpu(self, enable: bool):
+        flag = "--enable" if enable else "--disable"
+        try:
+            result = subprocess.run(
+                ["sudo", "-A", "voxtype", "setup", "gpu", flag],
+                env=sudo_env(), capture_output=True, text=True, timeout=180,
+            )
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            result = None
+            print(f"GPU-Umschaltung fehlgeschlagen: {exc}", file=sys.stderr)
+        if result is not None and result.returncode == 0:
+            subprocess.run(
+                ["systemctl", "--user", "restart", "voxtype"],
+                capture_output=True, timeout=60,
+            )
+        else:
+            # Abbruch (z. B. zenity-Dialog geschlossen) oder Fehler -> nur
+            # bei echtem Fehler stoeren, das Haekchen wird unten zurueckgesetzt
+            if result is not None and result.stderr.strip():
+                self.run_bg(["notify-send", "-u", "critical", "Voxtype",
+                             f"GPU-Umschaltung fehlgeschlagen:\n{result.stderr.strip()[:200]}"])
+        self._sync_gpu_state()
 
     def read_state(self) -> str | None:
         try:
