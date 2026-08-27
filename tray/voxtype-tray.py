@@ -64,6 +64,8 @@ class VoxtypeTray:
         menu = Gtk.Menu()
         for label, cb in (
             ("Aufnahme umschalten", lambda *_: self.toggle()),
+            ("Einstellungen (voxtype configure)", lambda *_: self.run_bg(
+                ["x-terminal-emulator", "-e", "voxtype configure"])),
             ("Voxtype neu starten", lambda *_: self.run_bg(
                 ["systemctl", "--user", "restart", "voxtype"])),
             ("Tray beenden", lambda *_: Gtk.main_quit()),
