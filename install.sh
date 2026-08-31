@@ -88,7 +88,13 @@ fi
 
 log "Enabling the Voxtype daemon"
 voxtype setup systemd >/dev/null 2>&1 || true
-systemctl --user enable --now voxtype
+systemctl --user daemon-reload
+# The upstream unit is WantedBy=graphical-session.target, a target Cinnamon
+# (X11) never activates — enabled that way, the daemon never starts at login.
+# Hook it into default.target instead (like ydotoold). disable must come
+# first: it removes ALL wants-symlinks, including one added by add-wants.
+systemctl --user disable voxtype >/dev/null 2>&1 || true
+systemctl --user add-wants default.target voxtype.service
 systemctl --user restart voxtype
 
 # --- Tray icon ------------------------------------------------------------
