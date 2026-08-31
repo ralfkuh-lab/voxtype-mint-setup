@@ -2,7 +2,8 @@
 
 Complete, reproducible setup of [Voxtype](https://voxtype.io) — local
 push-to-talk dictation with the Parakeet engine — on **Linux Mint 22.x with
-X11/Cinnamon**, including a tray icon that shows the recording state.
+X11/Cinnamon**, including a tray icon that shows the recording state and an
+on-screen recording overlay (waveform + level meter).
 
 Voxtype is primarily built for Wayland (Hyprland/Omarchy). On Mint/X11 a
 number of things break in non-obvious ways; this repo fixes all of them and
@@ -51,6 +52,13 @@ typed at the cursor position.
 - **Tray icon:** grey microphone = ready, green = recording,
   yellow = transcribing. Left-click toggles recording; right-click opens the
   menu (settings TUI, GPU toggle, restart daemon, quit tray).
+- **Overlay:** while recording, a small dark card appears at the
+  bottom-center of the focused window's monitor with a scrolling waveform
+  and a level meter with peak-hold (mic glyph turns amber while
+  transcribing, the waveform drains, the card disappears when idle). A flat
+  line while speaking means the microphone is muted or too quiet. It never
+  takes focus and is click-through; set `OVERLAY_ENABLED = False` at the top
+  of `tray/overlay.py` to turn it off.
 - **Language:** Parakeet (`parakeet-tdt-0.6b-v3-int8`, ~640 MB, CPU,
   multilingual incl. German/English) auto-detects the spoken language and
   transcribes ~7 s of audio in ~0.3 s on a modern CPU.
