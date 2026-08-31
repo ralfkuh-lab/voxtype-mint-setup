@@ -23,6 +23,12 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("XApp", "1.0")
 from gi.repository import Gio, GLib, Gtk, XApp
 
+try:
+    import overlay as overlay_mod
+except Exception as exc:
+    print(f"voxtype overlay disabled: {type(exc).__name__}: {exc}", file=sys.stderr)
+    overlay_mod = None
+
 ICON_DIR = Path(__file__).resolve().parent / "icons"
 STATE_FILE = Path(
     os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")
@@ -60,6 +66,7 @@ class VoxtypeTray:
         self.icon.connect("activate", self.on_activate)
         self.icon.set_secondary_menu(self.build_menu())
         self.current = None
+        self._overlay = overlay_mod
 
         self.refresh()
 
@@ -186,6 +193,15 @@ class VoxtypeTray:
                 TOOLTIPS.get(state, TOOLTIPS["idle"]) if state else TOOLTIP_OFF
             )
             print(f"State: {state or 'daemon off'}", file=sys.stderr)
+        if self._overlay is not None:
+            try:
+                self._overlay.set_state(state)
+            except Exception as exc:
+                print(
+                    f"voxtype overlay disabled: {type(exc).__name__}: {exc}",
+                    file=sys.stderr,
+                )
+                self._overlay = None
         return True  # keep the timeout alive
 
     def on_fs_event(self, _monitor, changed, _other, _event):
